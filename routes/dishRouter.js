@@ -1,5 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+
+const Dishes = require('../models/dishes');
 
 //This will declare dishRouter as an Express router - so mini-Express application
 const dishRouter = express.Router();
@@ -12,53 +15,98 @@ dishRouter.use(bodyParser.json());
 //Endpoint is specified in ".route".
 dishRouter.route('/')
 
-  //This will be done for all requests (get, put, post and delete) on "/dishes" endpoint. When you call
-  //"next()" it will continue to look for additional specifications which will match "/dishes" endpoint.
-  //Na primer ako imamo GET request na "/dishes" endpoint-u onda ce se prvo izvrsiti "app.all()" deo za "/dishes"
-  //endpoint i ako imamo "next()", onda ce da se proslede "req" i "res" iz "app.all()" (ako smo ih modifikovali u
-  //"app.all()" prosledjuju se modifikovani)u "app.get()" pa ce se izvrsiti i "app.get()".
-  //Isto vazi i za ostale metode "app.put()", "app.post()" i "app.delete()". 
-  .all((req, res, next) => {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'text/plain');
-    next();
-  })
-  .get((req, res, next) => {
-    res.end('Will send all the dishes to you!');
-  })
-  //When we use the "body-parser", the body of the incoming request will be parsed
-  //and then added into the "req" object as "req.body". So, the "req.body" will give you access
-  //to whatever is inside the body of the message.
-  .post((req, res, next) => {
-    res.end('Will add the dish: ' + req.body.name + ' with details: ' + req.body.description);
-  })
-  .put((req, res, next) => {
-    res.statusCode = 403; //403 means the operation not supported
-    res.end('PUT operation not supported on /dishes');
-  })
-  .delete((req, res, next) => {
-    res.end('Deleting all dishes');
-  });
+    //This will be done for all requests (get, put, post and delete) on "/dishes" endpoint. When you call
+    //"next()" it will continue to look for additional specifications which will match "/dishes" endpoint.
+    //Na primer ako imamo GET request na "/dishes" endpoint-u onda ce se prvo izvrsiti "app.all()" deo za "/dishes"
+    //endpoint i ako imamo "next()", onda ce da se proslede "req" i "res" iz "app.all()" (ako smo ih modifikovali u
+    //"app.all()" prosledjuju se modifikovani)u "app.get()" pa ce se izvrsiti i "app.get()".
+    //Isto vazi i za ostale metode "app.put()", "app.post()" i "app.delete()". 
+    //Ovo je ".all()" metod, ali ga necemo koristiti nego cemo umesto toga da dodamo taj deo posebno u sve ostale metode.
+    // .all((req, res, next) => {
+    //   res.statusCode = 200;
+    //   res.setHeader('Content-Type', 'text/plain');
+    //   next();
+    // })
+
+    .get((req, res, next) => {
+        Dishes.find({})
+            .then((dishes) => {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                //"res.json()" takes as a parameter a JSON string, and then it will put
+                //that into the body of the response message and send it back to the client.
+                res.json(dishes);
+                //If an error is returned, the error will be passed to overall error handler for our application.
+            }, (err) => next(err))
+            .catch((err) => next(err));
+    })
+    //When we use the "body-parser", the body of the incoming request will be parsed
+    //and then added into the "req" object as "req.body". So, the "req.body" will give you access
+    //to whatever is inside the body of the message.
+    .post((req, res, next) => {
+        Dishes.create(req.body)
+            .then((dish) => {
+                console.log('Dish Created ', dish);
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.json(dish);
+            }, (err) => next(err))
+            .catch((err) => next(err));
+    })
+    .put((req, res, next) => {
+        res.statusCode = 403; //403 means the operation not supported
+        res.setHeader('Content-Type', 'text/plain');
+        res.end('PUT operation not supported on /dishes');
+    })
+    .delete((req, res, next) => {
+        Dishes.deleteMany({})
+            .then((resp) => {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.json(resp);
+            }, (err) => next(err))
+            .catch((err) => next(err));
+    });
 
 dishRouter.route('/:dishId')
-  .all((req, res, next) => {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'text/plain');
-    next();
-  })
-  .get((req, res, next) => {
-    res.end('Will send details of the dish: ' + req.params.dishId + ' to you!');
-  })
-  .post((req, res, next) => {
-    res.statusCode = 403;
-    res.end('POST operation not supported on /dishes/' + req.params.dishId);
-  })
-  .put((req, res, next) => {
-    res.write('Updating the dish: ' + req.params.dishId + '\n');
-    res.end('Will update the dish: ' + req.body.name + ' with details: ' + req.body.description);
-  })
-  .delete((req, res, next) => {
-    res.end('Deleting dish: ' + req.params.dishId);
-  });
+    // .all((req, res, next) => {
+    //     res.statusCode = 200;
+    //     res.setHeader('Content-Type', 'text/plain');
+    //     next();
+    // })
+    .get((req, res, next) => {
+        Dishes.findById(req.params.dishId)
+            .then((dish) => {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.json(dish);
+            }, (err) => next(err))
+            .catch((err) => next(err));
+    })
+    .post((req, res, next) => {
+        res.statusCode = 403;
+        res.end('POST operation not supported on /dishes/' + req.params.dishId);
+    })
+    .put((req, res, next) => {
+        Dishes.findByIdAndUpdate(req.params.dishId, {
+            //The update will be in the body of the message.
+            $set: req.body
+        }, { new: true })
+            .then((dish) => {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.json(dish);
+            }, (err) => next(err))
+            .catch((err) => next(err));
+    })
+    .delete((req, res, next) => {
+        Dishes.findByIdAndDelete(req.params.dishId)
+            .then((resp) => {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.json(resp);
+            }, (err) => next(err))
+            .catch((err) => next(err));
+    });
 
 module.exports = dishRouter;
