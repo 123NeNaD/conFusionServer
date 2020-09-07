@@ -9,10 +9,24 @@
     "cookie-parser": "~1.4.3",
     "debug": "~2.6.9",
     "express": "~4.16.0",
+    "express-session": "^1.17.1",
     "http-errors": "~1.6.2",
     "jade": "~1.11.0",
     "mongoose": "^5.10.0",
     "mongoose-currency": "^0.2.0",
-    "morgan": "~1.9.0"
-  }
+    "morgan": "~1.9.0",
+    "session-file-store": "^1.4.0"
+  },
+  "description": "ConFusion Server",
+  "main": "app.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/123NeNaD/conFusionServer.git"
+  },
+  "author": "123NeNaD",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/123NeNaD/conFusionServer/issues"
+  },
+  "homepage": "https://github.com/123NeNaD/conFusionServer#readme"
 }
