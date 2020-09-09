@@ -6,6 +6,8 @@ var logger = require("morgan");
 var session = require('express-session');
 //"session-file-store" Middleware takes "express-session" Middleware as the parameter
 var FileStore = require('session-file-store')(session);
+var passport = require('passport');
+var authenticate = require('./authenticate');
 
 var indexRouter = require("./routes/indexRouter");
 var userRouter = require("./routes/userRouter");
@@ -62,6 +64,16 @@ app.use(session({
     store: new FileStore()
 }));
 
+//"passport.initialize()" Middleware is required to initialize Passport.
+//If your application uses persistent login sessions, "passport.session()" Middleware must also be used.
+//Upon completion of the successful authentication of the user by Passport, Passport adds a "user" property
+//to the request message. The "passport.session()" Middleware will automatically serialize that user infomation
+//and then store it in the session. Also, whenever incoming request comes in from the client side
+//with the session cookie, then this will automatically load the "req.user" on to the incoming request. So, that
+//is how "passport.session()" Middleware itself is organized.
+app.use(passport.initialize());
+app.use(passport.session());
+
 app.use("/", indexRouter);
 app.use("/users", userRouter);
 
@@ -70,21 +82,16 @@ app.use("/users", userRouter);
 //go through the authorization phase before that Middleware can be accessed.
 //We will implement a function named "auth" and then use it as the Middleware.
 function auth(req, res, next) {
-    console.log(req.session);
-    //Posto je "login" klijenta vec obavljen u "/users/login" "endpoint"-u, ako "req.session.user"
-    //ne postoji, znaci da klijent nije autentifikovan.
-    if (!req.session.user) {
+    console.log(req.user);
+    //When the user is logged in, the "req.user" will be automatically loaded in by the "passport.session()" Middleware. 
+    //If "req.user" exists, that means that Passport has done the authentication and the "req.user" is loaded on to the 
+    //request message object.
+    if (!req.user) {
         var err = new Error('You are not authenticated!');
         err.status = 403;
-        return next(err);
+        next(err);
     } else {
-        if (req.session.user === 'authenticated') {
-            next();
-        } else {
-            var err = new Error('You are not authenticated!');
-            err.status = 403;
-            return next(err);
-        }
+        next();
     }
 }
 app.use(auth);
