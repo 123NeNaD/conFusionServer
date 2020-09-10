@@ -2,6 +2,7 @@ var express = require('express');
 const bodyParser = require('body-parser');
 var User = require('../models/user');
 var passport = require('passport');
+var authenticate = require('../authenticate');
 
 var router = express.Router();
 router.use(bodyParser.json());
@@ -40,11 +41,21 @@ router.post('/signup', (req, res, next) => {
 //So, when the "router.post()" comes on the "/login" endpoint, we will first call the "passport.authenticate('local')". If
 //this is successful then the "(req,res)=>" function will be executed. If there is any error in the authentication, this
 //"passport.authenticate('local')" will automatically send back a reply to the client about the failure of the authentication.
-//If the user is logged in, then the "passport.authenticate('local')" will automatically add the "user" property to the request message. 
+//If the user is logged in, then the "passport.authenticate('local')" will automatically add the "user" property to the request message object. 
+//This is where we will create JSON Web Token.
+//To issue the JSON Web Token, we first need to authenticate the user using one of the other strategies. So, we are first using
+//Local Strategy and we are authenticating the user using username and password. Once the user is authenticated
+//with the username and password, then we will issue the token to the user. All subsequent requests will simply
+//carry the token in the Authorization header of the incoming request message.
+//For creating a token, we will use the function "authenticate.getToken()" that we have define in "authenticate.js" 
+//file and we will pass as the parameter the user_id, so that it can be stored in the Payload part of JSON Web Token that we are creating.
+//When we create the JSON Web Token, we will sent it back to the client in a response message.
 router.post('/login', passport.authenticate('local'), (req, res) => {
+    var token = authenticate.getToken({ _id: req.user._id });
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
-    res.json({ success: true, status: 'You are successfully logged in!' });
+    //Sending back the token as one of the properties in the reply message.
+    res.json({ success: true, token: token, status: 'You are successfully logged in!' });
 });
 
 //This "/logout" endpoint will allow a user to logout from the system. Only the "get" method will be allowed on 
