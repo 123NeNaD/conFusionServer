@@ -18,9 +18,11 @@ var commentSchema = new Schema({
         type: String,
         required: true
     },
+    //Koristimo Mongoose. "author" field will have a reference to the User document. Dakle "author" polje
+    //ce imati referencu u vidu ObjectId-ja, a taj ObjectId ce biti ObjectId dokumenta koji je Schema-e User.
     author: {
-        type: String,
-        required: true
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
     }
 }, {
     //The timestamps allow you to have two different fields in the document: the "createdAt" field

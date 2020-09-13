@@ -31,6 +31,9 @@ dishRouter.route('/')
 
     .get((req, res, next) => {
         Dishes.find({})
+            //We are using Mongoose Population. By stating this ".populate('comments.author')", we are saying when the dishes document
+            //has been constructed to send back the reply to the user, we are going to populate the author field by User document.
+            .populate('comments.author')
             .then((dishes) => {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
@@ -82,6 +85,7 @@ dishRouter.route('/:dishId')
     // })
     .get((req, res, next) => {
         Dishes.findById(req.params.dishId)
+            .populate('comments.author')
             .then((dish) => {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
@@ -118,6 +122,7 @@ dishRouter.route('/:dishId')
 dishRouter.route('/:dishId/comments')
     .get((req, res, next) => {
         Dishes.findById(req.params.dishId)
+            .populate('comments.author')
             .then((dish) => {
                 if (dish != null) {
                     res.statusCode = 200;
@@ -137,13 +142,27 @@ dishRouter.route('/:dishId/comments')
         Dishes.findById(req.params.dishId)
             .then((dish) => {
                 if (dish != null) {
+                    //The body of the request message contains the comment already, but the author property will not be there
+                    //in the body of the request message. So, depending on which user is posting this information we can
+                    //populate the author field. S obzirom da je odgovarajuci korisnik vec autentifikovan da bi dosao do ovog dela,
+                    //vec imamo tog korisnika u "req.user" property-ju. Dakle, uzimamo "_id" korisnika koji predstavlja ObjectID
+                    //odgovarajuceg User documenta i to pamtimo u "author" polju. Tako da vise klijent nece unositi svoje ime, vec
+                    //ce se to automatski obavljati na serveru kada korisnik pokusa da onese komentar, nakon autentifikacije tog korisnika.
+                    req.body.author = req.user._id;
                     dish.comments.push(req.body);
                     dish.save()
                         .then((dish) => {
-                            res.statusCode = 200;
-                            res.setHeader('Content-Type', 'application/json');
-                            res.json(dish);
+                            //Sada vracamo nazad Dish information korisnik-u, ali nakon nalazenja odgovarajuceg "Dish"-a, radimo
+                            //Mongoose Population "author" field-a i onda tek vracamo rezultat.
+                            Dishes.findById(dish._id)
+                                .populate('comments.author')
+                                .then((dish) => {
+                                    res.statusCode = 200;
+                                    res.setHeader('Content-Type', 'application/json');
+                                    res.json(dish);
+                                })
                         }, (err) => next(err));
+
                 }
                 else {
                     var err = new Error('Dish ' + req.params.dishId + ' not found');
@@ -186,6 +205,7 @@ dishRouter.route('/:dishId/comments')
 dishRouter.route('/:dishId/comments/:commentId')
     .get((req, res, next) => {
         Dishes.findById(req.params.dishId)
+            .populate('comments.author')
             .then((dish) => {
                 if (dish != null && dish.comments.id(req.params.commentId) != null) {
                     res.statusCode = 200;
@@ -221,10 +241,16 @@ dishRouter.route('/:dishId/comments/:commentId')
                         dish.comments.id(req.params.commentId).comment = req.body.comment;
                     }
                     dish.save()
+                        //Sada vracamo nazad Dish information korisnik-u, ali nakon nalazenja odgovarajuceg "Dish"-a, radimo
+                        //Mongoose Population "author" field-a i onda tek vracamo rezultat.
                         .then((dish) => {
-                            res.statusCode = 200;
-                            res.setHeader('Content-Type', 'application/json');
-                            res.json(dish);
+                            Dishes.findById(dish._id)
+                                .populate('comments.author')
+                                .then((dish) => {
+                                    res.statusCode = 200;
+                                    res.setHeader('Content-Type', 'application/json');
+                                    res.json(dish);
+                                })
                         }, (err) => next(err));
                 }
                 else if (dish == null) {
@@ -247,9 +273,13 @@ dishRouter.route('/:dishId/comments/:commentId')
                     dish.comments.id(req.params.commentId).remove();
                     dish.save()
                         .then((dish) => {
-                            res.statusCode = 200;
-                            res.setHeader('Content-Type', 'application/json');
-                            res.json(dish);
+                            Dishes.findById(dish._id)
+                                .populate('comments.author')
+                                .then((dish) => {
+                                    res.statusCode = 200;
+                                    res.setHeader('Content-Type', 'application/json');
+                                    res.json(dish);
+                                })
                         }, (err) => next(err));
                 }
                 else if (dish == null) {

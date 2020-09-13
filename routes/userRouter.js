@@ -23,14 +23,32 @@ router.post('/signup', (req, res, next) => {
             res.setHeader('Content-Type', 'application/json');
             res.json({ err: err });
         } else {
-            //To ensure that the user registration was seccessful, we will try to authenticate the
-            //same user that we just registered.
-            passport.authenticate('local')(req, res, () => {
-                res.statusCode = 200;
-                res.setHeader('Content-Type', 'application/json');
-                res.json({ success: true, status: 'Registration Successful!' });
+            //After the user is successfuly registered, we will set the "firstname" and "lastname" filed of the user.
+            //Ako "body of the request message" sadrzi "firstname" onda cemo tu vrednost da dodamo korisniku u polje "firstname". 
+            //Ako "body of the request message" ne sadrzi "firstname", default "" se upisuje korisniku u polje "firstname". 
+            if (req.body.firstname)
+                user.firstname = req.body.firstname;
+            //Ako "body of the request message" sadrzi "lastname" onda cemo tu vrednost da dodamo korisniku u polje "lastname". 
+            //Ako "body of the request message" ne sadrzi "lastname", default "" se upisuje korisniku u polje "lastname". 
+            if (req.body.lastname)
+                user.lastname = req.body.lastname;
+            //Saving the modification that we have done to the user (we have updated "firstname" and "lastname")
+            user.save((err, user) => {
+                if (err) {
+                    res.statusCode = 500;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json({ err: err });
+                    return;
+                }
+                //To ensure that the user registration was seccessful, we will try to authenticate the
+                //same user that we just registered.
+                passport.authenticate('local')(req, res, () => {
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json({ success: true, status: 'Registration Successful!' });
+                });
             });
-        }
+        };
     });
 });
 
