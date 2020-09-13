@@ -8,8 +8,17 @@ var router = express.Router();
 router.use(bodyParser.json());
 
 /* GET users listing. */
-router.get('/', function (req, res, next) {
-    res.send('respond with a resource');
+router.get('/', authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
+    User.find({})
+        .then((users) => {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            //"res.json()" takes as a parameter a JSON string, and then it will put
+            //that into the body of the response message and send it back to the client.
+            res.json(users);
+            //If an error is returned, the error will be passed to overall error handler for our application.
+        }, (err) => next(err))
+        .catch((err) => next(err));
 });
 
 //This "/signup" endpoint will allow a user to sign up on the system. Only the "post" method will be allowed on 

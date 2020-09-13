@@ -68,3 +68,22 @@ exports.jwtPassport = passport.use(new JwtStrategy(opts, (jwt_payload, done) => 
 //So, if JSON Web Token is included in the Authorization header, then it will be extracted and it will be 
 //used to authenticate the user.
 exports.verifyUser = passport.authenticate('jwt', { session: false });
+
+//This function will check an ordinary user to see if he has Admin privileges. When the user's token is 
+//checked in "verifyUser()" function, it will load a new property named user to the request object.
+//This will be available to you if the "verifyAdmin()" follows "verifyUser()" in the middleware order in Express. 
+exports.verifyAdmin = (req, res, next) => {
+    if (req.user) {
+        if (req.user.admin) {
+            return next();
+        } else {
+            var err = new Error('You are not authorized to perform this operation!');
+            err.status = 403;
+            return next(err);
+        }
+    } else {
+        var err = new Error('You are not authenticated!');
+        err.status = 403;
+        return next(err);
+    }
+};

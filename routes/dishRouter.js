@@ -52,7 +52,9 @@ dishRouter.route('/')
     //if this is successful then it will move to the "(req, res, next) =>". If the authentication fails
     //then Passport will reply back to the client with the appropriate error message. 
     //So, this way we are making sure that only the authenticated user can access this endpoint.
-    .post(authenticate.verifyUser, (req, res, next) => {
+    //Nakon sto proveravamo da li je korisnik registrovan korisnik, proveravamo i da li je korisnik 
+    //admin, i u zavisnosti od toga ga pustamo dalje ili ne.
+    .post(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         Dishes.create(req.body)
             .then((dish) => {
                 console.log('Dish Created ', dish);
@@ -62,12 +64,12 @@ dishRouter.route('/')
             }, (err) => next(err))
             .catch((err) => next(err));
     })
-    .put(authenticate.verifyUser, (req, res, next) => {
+    .put(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         res.statusCode = 403; //403 means the operation not supported
         res.setHeader('Content-Type', 'text/plain');
         res.end('PUT operation not supported on /dishes');
     })
-    .delete(authenticate.verifyUser, (req, res, next) => {
+    .delete(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         Dishes.deleteMany({})
             .then((resp) => {
                 res.statusCode = 200;
@@ -93,11 +95,11 @@ dishRouter.route('/:dishId')
             }, (err) => next(err))
             .catch((err) => next(err));
     })
-    .post(authenticate.verifyUser, (req, res, next) => {
+    .post(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         res.statusCode = 403;
         res.end('POST operation not supported on /dishes/' + req.params.dishId);
     })
-    .put(authenticate.verifyUser, (req, res, next) => {
+    .put(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         Dishes.findByIdAndUpdate(req.params.dishId, {
             //The update will be in the body of the message.
             $set: req.body
@@ -109,7 +111,7 @@ dishRouter.route('/:dishId')
             }, (err) => next(err))
             .catch((err) => next(err));
     })
-    .delete(authenticate.verifyUser, (req, res, next) => {
+    .delete(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         Dishes.findByIdAndDelete(req.params.dishId)
             .then((resp) => {
                 res.statusCode = 200;
@@ -176,7 +178,7 @@ dishRouter.route('/:dishId/comments')
         res.statusCode = 403;
         res.end('PUT operation not supported on /dishes/' + req.params.dishId + '/comments');
     })
-    .delete(authenticate.verifyUser, (req, res, next) => {
+    .delete(authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
         Dishes.findById(req.params.dishId)
             .then((dish) => {
                 if (dish != null) {
@@ -233,25 +235,37 @@ dishRouter.route('/:dishId/comments/:commentId')
         Dishes.findById(req.params.dishId)
             .then((dish) => {
                 if (dish != null && dish.comments.id(req.params.commentId) != null) {
-                    //There is no specific method for updating subdocuments. We have to do this this way.
-                    if (req.body.rating) {
-                        dish.comments.id(req.params.commentId).rating = req.body.rating;
+                    //Korisnik moze da update-uje komentar samo ako ga je on i napravio. Korisnik ne moze da menja komentare
+                    //koji pripadaju drugim korisnicima. Zato upredjujemo "req.user._id" koji "authenticate.verifyUser" dodaje
+                    //nakon uspesne autentifikacije, sa poljem "author" iz tog komentara posto polje "author" sadrzi ObjectId
+                    //korisnika koji je napravio taj komentar.
+                    //ObjectIDs behave like Strings, and hence when comparing two ObjectIDs, you should 
+                    //use the "Id1.equals(id2)" syntax.
+                    if (req.user._id.equals(dish.comments.id(req.params.commentId).author)) {
+                        //There is no specific method for updating subdocuments. We have to do this this way.
+                        if (req.body.rating) {
+                            dish.comments.id(req.params.commentId).rating = req.body.rating;
+                        }
+                        if (req.body.comment) {
+                            dish.comments.id(req.params.commentId).comment = req.body.comment;
+                        }
+                        dish.save()
+                            //Sada vracamo nazad Dish information korisnik-u, ali nakon nalazenja odgovarajuceg "Dish"-a, radimo
+                            //Mongoose Population "author" field-a i onda tek vracamo rezultat.
+                            .then((dish) => {
+                                Dishes.findById(dish._id)
+                                    .populate('comments.author')
+                                    .then((dish) => {
+                                        res.statusCode = 200;
+                                        res.setHeader('Content-Type', 'application/json');
+                                        res.json(dish);
+                                    })
+                            }, (err) => next(err));
+                    } else {
+                        var err = new Error("You are not authorized to update this comment! You can only update your own comments.");
+                        err.status = 403;
+                        return next(err);
                     }
-                    if (req.body.comment) {
-                        dish.comments.id(req.params.commentId).comment = req.body.comment;
-                    }
-                    dish.save()
-                        //Sada vracamo nazad Dish information korisnik-u, ali nakon nalazenja odgovarajuceg "Dish"-a, radimo
-                        //Mongoose Population "author" field-a i onda tek vracamo rezultat.
-                        .then((dish) => {
-                            Dishes.findById(dish._id)
-                                .populate('comments.author')
-                                .then((dish) => {
-                                    res.statusCode = 200;
-                                    res.setHeader('Content-Type', 'application/json');
-                                    res.json(dish);
-                                })
-                        }, (err) => next(err));
                 }
                 else if (dish == null) {
                     var err = new Error('Dish ' + req.params.dishId + ' not found');
@@ -270,17 +284,29 @@ dishRouter.route('/:dishId/comments/:commentId')
         Dishes.findById(req.params.dishId)
             .then((dish) => {
                 if (dish != null && dish.comments.id(req.params.commentId) != null) {
-                    dish.comments.id(req.params.commentId).remove();
-                    dish.save()
-                        .then((dish) => {
-                            Dishes.findById(dish._id)
-                                .populate('comments.author')
-                                .then((dish) => {
-                                    res.statusCode = 200;
-                                    res.setHeader('Content-Type', 'application/json');
-                                    res.json(dish);
-                                })
-                        }, (err) => next(err));
+                    //Korisnik moze da obrise komentar samo ako ga je on i napravio. Korisnik ne moze da brise komentare
+                    //koji pripadaju drugim korisnicima. Zato upredjujemo "req.user._id" koji "authenticate.verifyUser" dodaje
+                    //nakon uspesne autentifikacije, sa poljem "author" iz tog komentara posto polje "author" sadrzi ObjectId
+                    //korisnika koji je napravio taj komentar.
+                    //ObjectIDs behave like Strings, and hence when comparing two ObjectIDs, you should 
+                    //use the "Id1.equals(id2)" syntax.
+                    if (req.user._id.equals(dish.comments.id(req.params.commentId).author)) {
+                        dish.comments.id(req.params.commentId).remove();
+                        dish.save()
+                            .then((dish) => {
+                                Dishes.findById(dish._id)
+                                    .populate('comments.author')
+                                    .then((dish) => {
+                                        res.statusCode = 200;
+                                        res.setHeader('Content-Type', 'application/json');
+                                        res.json(dish);
+                                    })
+                            }, (err) => next(err));
+                    } else {
+                        var err = new Error("You are not authorized to delete this comment! You can only delete your own comments.");
+                        err.status = 403;
+                        return next(err);
+                    }
                 }
                 else if (dish == null) {
                     var err = new Error('Dish ' + req.params.dishId + ' not found');
