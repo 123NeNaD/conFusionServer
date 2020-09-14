@@ -42,6 +42,26 @@ connect.then(
 
 var app = express();
 
+// Secure traffic only
+//We are configuring the server such that it will redirect any traffic coming to the 
+//unsecure port, to the secure port. We are doing this for all requests, no matter what
+//the path in the request is.
+app.all('*', (req, res, next) => {
+    //This means that if the incoming request is already a secure request. So, how we know that?
+    //If the incoming request is already a secure request, then the request object will carry this 
+    //flag called "secure" which will be already set to true. If the incoming request is not at
+    //our secure port but instead is coming to the insecure port, then the "req.secure" will not be set.
+    if (req.secure) {
+        return next();
+    }
+    else {
+        //"redirect()" method redirects the incoming request to another URL.
+        //So, we are redirecting the incoming requests from unsecure port to secure port.
+        //Also, we will add the return status code as 307.
+        res.redirect(307, 'https://' + req.hostname + ':' + app.get('secPort') + req.url);
+    }
+});
+
 // view engine setup
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "jade");

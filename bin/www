@@ -7,6 +7,9 @@
 var app = require('../app');
 var debug = require('debug')('confusionserver:server');
 var http = require('http');
+//We are importing the HTTPS core module. We will also import the file system module.
+var https = require('https');
+var fs = require('fs');
 
 /**
  * Get port from environment and store in Express.
@@ -14,6 +17,18 @@ var http = require('http');
 
 var port = normalizePort(process.env.PORT || '3000');
 app.set('port', port);
+//We are configuring the port number at which out HTTPS protocol will be running.
+//So we are going to set up a variable here called "secPort" (secure port) and then we will initialize this to "port+443". 
+//Now, why do we use this "port+443"? In a standard server, if your server is acting as a web server, your HTTP protocol 
+//will be running at port number 80 on your server. And the HTTPS will run on port number 443.
+//Now, you would normally not want to use those reserved ports in a development application that we are doing in this course.
+//Instead, as you saw earlier, we had configured our port number to 3000 where our HTTP server is running. 
+//So we are going to be running the HTTPS server at port number 3443. So 3000 plus 443. So that's the reason 
+//why we are declaring this "secPort" (secure port) as "port+443". We will still be running the HTTP server at port 3000.
+//Now, the reason why we are going to still run the HTTP server is that, if we get a request on the HTTP server's port, 
+//then that request will be redirected to the HTTPS server. So our server will only service requests coming in on the 
+//HTTPS port. But if by chance anybody accesses the server at the HTTP port, I will redirect that request to the HTTPS port.
+app.set('secPort', port + 443);
 
 /**
  * Create HTTP server.
@@ -30,23 +45,53 @@ server.on('error', onError);
 server.on('listening', onListening);
 
 /**
+ * Create HTTPS server.
+ */
+//We are configuring HTTPS server.
+//To configure HTTPS server, we will declare a few options for our HTTPS server. For an HTTPS server, 
+//we need to configure the private key and the certificate that our HTTPS server is going to use.
+var options = {
+    //We use "readFileSync()" so that we read this file synchronously which means that the file will be 
+    //read completely before we proceed on to that next step and configure our HTTPS server. 
+    key: fs.readFileSync(__dirname + '/82083089_httplocalhost3000.key'),
+    cert: fs.readFileSync(__dirname + '/82083089_httplocalhost3000.cert')
+};
+
+//We are configuring the secure server.
+var secureServer = https.createServer(options, app);
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+//We are configuring the secure server to listen on port number "secPort".
+secureServer.listen(app.get('secPort'), () => {
+    console.log('Secure Server listening on port', app.get('secPort'));
+});
+//If the "secureServer" receives an error event, then we will let the "onError" which is configured down below, to handle that.
+secureServer.on('error', onError);
+//If the "secureServer" receives an listening event, then we will let the "onListening" which is configured down below, to handle that.
+secureServer.on('listening', onListening);
+
+
+/**
  * Normalize a port into a number, string, or false.
  */
 
 function normalizePort(val) {
-  var port = parseInt(val, 10);
+    var port = parseInt(val, 10);
 
-  if (isNaN(port)) {
-    // named pipe
-    return val;
-  }
+    if (isNaN(port)) {
+        // named pipe
+        return val;
+    }
 
-  if (port >= 0) {
-    // port number
-    return port;
-  }
+    if (port >= 0) {
+        // port number
+        return port;
+    }
 
-  return false;
+    return false;
 }
 
 /**
@@ -54,27 +99,27 @@ function normalizePort(val) {
  */
 
 function onError(error) {
-  if (error.syscall !== 'listen') {
-    throw error;
-  }
+    if (error.syscall !== 'listen') {
+        throw error;
+    }
 
-  var bind = typeof port === 'string'
-    ? 'Pipe ' + port
-    : 'Port ' + port;
+    var bind = typeof port === 'string'
+        ? 'Pipe ' + port
+        : 'Port ' + port;
 
-  // handle specific listen errors with friendly messages
-  switch (error.code) {
-    case 'EACCES':
-      console.error(bind + ' requires elevated privileges');
-      process.exit(1);
-      break;
-    case 'EADDRINUSE':
-      console.error(bind + ' is already in use');
-      process.exit(1);
-      break;
-    default:
-      throw error;
-  }
+    // handle specific listen errors with friendly messages
+    switch (error.code) {
+        case 'EACCES':
+            console.error(bind + ' requires elevated privileges');
+            process.exit(1);
+            break;
+        case 'EADDRINUSE':
+            console.error(bind + ' is already in use');
+            process.exit(1);
+            break;
+        default:
+            throw error;
+    }
 }
 
 /**
@@ -82,9 +127,9 @@ function onError(error) {
  */
 
 function onListening() {
-  var addr = server.address();
-  var bind = typeof addr === 'string'
-    ? 'pipe ' + addr
-    : 'port ' + addr.port;
-  debug('Listening on ' + bind);
+    var addr = server.address();
+    var bind = typeof addr === 'string'
+        ? 'pipe ' + addr
+        : 'port ' + addr.port;
+    debug('Listening on ' + bind);
 }
