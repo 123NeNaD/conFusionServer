@@ -3,12 +3,14 @@ const bodyParser = require('body-parser');
 var User = require('../models/user');
 var passport = require('passport');
 var authenticate = require('../authenticate');
+const cors = require('./cors');
 
 var router = express.Router();
 router.use(bodyParser.json());
 
 /* GET users listing. */
-router.get('/', authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
+//We are applying "cors.corsWithOptions" even if this is GET, because this can be performed only by admin.
+router.get('/', cors.corsWithOptions, authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
     User.find({})
         .then((users) => {
             res.statusCode = 200;
@@ -23,7 +25,7 @@ router.get('/', authenticate.verifyUser, authenticate.verifyAdmin, (req, res, ne
 
 //This "/signup" endpoint will allow a user to sign up on the system. Only the "post" method will be allowed on 
 //"/signup" endpoint. The remaining methods will not be allowed. 
-router.post('/signup', (req, res, next) => {
+router.post('/signup', cors.corsWithOptions, (req, res, next) => {
     //The "passport-local-mongoose" plugin provides us with a method called "register" on the user Schema and model.
     //"register(user, password, callback)" is a convenience method to register a new user instance with a given password. It also checks if username is unique.
     User.register(new User({ username: req.body.username }), req.body.password, (err, user) => {
@@ -77,7 +79,7 @@ router.post('/signup', (req, res, next) => {
 //For creating a token, we will use the function "authenticate.getToken()" that we have define in "authenticate.js" 
 //file and we will pass as the parameter the user_id, so that it can be stored in the Payload part of JSON Web Token that we are creating.
 //When we create the JSON Web Token, we will sent it back to the client in a response message.
-router.post('/login', passport.authenticate('local'), (req, res) => {
+router.post('/login', cors.corsWithOptions, passport.authenticate('local'), (req, res) => {
     var token = authenticate.getToken({ _id: req.user._id });
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
@@ -88,7 +90,7 @@ router.post('/login', passport.authenticate('local'), (req, res) => {
 //This "/logout" endpoint will allow a user to logout from the system. Only the "get" method will be allowed on 
 //"/logout" endpoint. The remaining methods will not be allowed. We are doing the "get" for logging out because for
 //logging out we dont need  to submit any information.
-router.get('/logout', (req, res, next) => {
+router.get('/logout', cors.corsWithOptions, (req, res, next) => {
     if (req.session) {
         //The session itself provides a method "destroy()". When you call "destroy()" method, the session is destroyed
         //and the information pertaining to this session is removed from the server side. So, "destroy()" method 
