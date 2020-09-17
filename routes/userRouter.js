@@ -111,4 +111,28 @@ router.get('/logout', cors.corsWithOptions, (req, res, next) => {
     }
 });
 
+//Ovu "route"-u koristimo za logovanje preko Facebook-a. Ako korisnik nema nalog na nasem sistemu, bice mu napravljen nalog, a 
+//ako se vec ranije logovao preko Facebook-a na nas sistem, to znaci da vec ima nalog na nasem sistemu, i u tom slucaju ce biti 
+//ulogovan na nas sistem.
+//So, if the user sends a GET request to "users/facebook/token" endpoint, then we're going to be authenticating the user using 
+//the Facebook OAuth2-based authentication.
+//Kada se korisnik uloguje preko Facebook-a, on od Facebook-a dobije Acces Token, i taj Acces Token korisnik onda salje serveru.
+//So, the user is sending the Access Token to the Express server, the Express server uses the Access Token to go to Facebook and then
+//fetch the profile of the user. And if the user doesn't exist, we'll create a new user with that Facebook ID. And then after that, our 
+//Express server will generate a JSON Web Token and then return the JSON Web Token to our client. All subsequent accesses from our user
+//will have to include this JSON Web Token that we have just returned. So at this point you no longer need the Facebook Access Token anymore.
+//You can discard the Facebook Access Token at this point because the JSON Web Token is the one that keeps the users authentication active
+//for whatever duration that this JSON Web Token is active. 
+router.get('/facebook/token', passport.authenticate('facebook-token'), (req, res) => {
+    //When we call "passport.authenticate()" with the "facebook-token" strategy, if it is successful, it would have loaded
+    //in the "user" into the "req" (request) object. 
+    if (req.user) {
+        //Pravimo JSON Web Token isto kao sto smo radili i kada se korisnik uloguje preko Local Authenitcation Strategy ("/login" endpoint).
+        var token = authenticate.getToken({ _id: req.user._id });
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.json({ success: true, token: token, status: 'You are successfully logged in!' });
+    }
+});
+
 module.exports = router;

@@ -4,6 +4,7 @@ const cors = require('cors');
 const app = express();
 
 //The "whitelist" is an array of strings, and it contains all the origins that this server is willing to accept.
+//Znaci da cemo samo "request"-ove sa ovih domena da prihvatamo.
 const whitelist = ['http://localhost:3000', 'https://localhost:3443'];
 
 //By calling this function "corsOptionsDelegate", we will check to see if the incoming request belongs to one of the "whitelist" origins.
@@ -34,5 +35,8 @@ var corsOptionsDelegate = (req, callback) => {
 //There are certain routes on which this is acceptable to do, especially whenever we perform GET operations. 
 //Also, we will configure "corsWithOptions" by saying "cors()" and then we'll supply the "corsOptionsDelegate" function that we have defined above. 
 //This way, if we need to apply "cors" with specific options to a particular route, we will use this corsWithOptions. Otherwise, we'll use the standard "cors".
+//Znaci kada budemo koristili "cors" na nekom "endpoint"-u za neki odredjeni metod (GET, PUT, POST, DELETE), svim domenima ce biti dozvoljeno da pristupe.
+//Kada budemo koristili "corsWithOptions" na nekom "endpoint"-u za neki odredjeni metod (GET, PUT, POST, DELETE), samo domenima koji se nalaze u "whitelist" ce 
+//biti dozvoljeno da pristupe. Zato "cors" uglavnom koristimo za GET request-ove, a "corsWithOptions" koristimo za PUT, POST i DELETE request-ove.
 exports.cors = cors();
 exports.corsWithOptions = cors(corsOptionsDelegate);

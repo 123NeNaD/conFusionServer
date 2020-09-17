@@ -7,6 +7,7 @@ var User = require('./models/user');
 var JwtStrategy = require('passport-jwt').Strategy;
 var ExtractJwt = require('passport-jwt').ExtractJwt;
 var jwt = require('jsonwebtoken'); // used to create, sign, and verify tokens
+var FacebookTokenStrategy = require('passport-facebook-token');
 
 var config = require('./config.js');
 
@@ -87,3 +88,45 @@ exports.verifyAdmin = (req, res, next) => {
         return next(err);
     }
 };
+
+//Pravimo novu strategiju za autentifikaciju korisnika preko Facebook-a.
+//Whenever the user logs in and then obtains the access token and passes it on to our Express server, the Express server is going to
+//use that access token and go and fetch the profile information from the Facebook OAuth server. And then, once it obtains the profile information,
+//then our Express server will create a new user account into our application, and use the Facebook ID as the index into this user account.
+exports.facebookPassport = passport.use(new FacebookTokenStrategy({
+    clientID: config.facebook.clientId,
+    clientSecret: config.facebook.clientSecret
+}, (accessToken, refreshToken, profile, done) => {
+    //U ovoj callback funkciji proveravamo prvo da li se korisnik ranije vec ulogovao preko svoj Facebook naloga, posto u tom slucaju
+    //njegov nalog bi vec bio napravljen sa "facebookId". "facebookId" korisnika koji se trenutno loguje mozemo naci u "profile.id".
+    //This "profile" will carry a lot of information coming in from Facebook that we can use within our application.
+    //The "accessToken" is supplied to the server by the user.
+    User.findOne({ facebookId: profile.id }, (err, user) => {
+        //Ako ima greska, vracamo gresku.
+        if (err) {
+            return done(err, false);
+        }
+        //Ako nema greska i korisnik sa tim "facebookId"-jem vec postoji u nasem sistemu, vracamo korisnika.
+        //To znaci da se korisnik ranije vec logovao preko Facebook-a na nas sistem i da mu je profil na nasem sistemu vec napraviljen.
+        if (!err && user !== null) {
+            return done(null, user);
+        }
+        //Ako korisnik sa tim "facebookId"-jem ne postoji u nasem sistemu, onda cemo da mu napravimo nalog na nasem sistemu.
+        else {
+            //Pravimo novog korisnika sa "username"-om koji dobijamo iz "profile.displayName". Zatim popunjavamo i ostala polja
+            //za tog korisnika. I vrednosti ostalih polja isto dobijamo iz "profile" objekta.
+            user = new User({ username: profile.displayName });
+            user.facebookId = profile.id;
+            user.firstname = profile.name.givenName;
+            user.lastname = profile.name.familyName;
+            //We are saving the changes to the user.
+            user.save((err, user) => {
+                if (err)
+                    return done(err, false);
+                else
+                    return done(null, user);
+            })
+        }
+    });
+}
+));
