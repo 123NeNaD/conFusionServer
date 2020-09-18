@@ -36,7 +36,10 @@ dishRouter.route('/')
     // })
 
     .get(cors.cors, (req, res, next) => {
-        Dishes.find({})
+        //"req.query" sadrzi sve query parametre iz request message. Express te query parametre pretvori u JSON object i mi jednostavno
+        //mozemo direktno "req.query" da ubacimo kao parametar filtra za pretragu i kao rezultat ce biti vraceno sve sto ispunjava
+        //uslove date query parametrima.
+        Dishes.find(req.query)
             //We are using Mongoose Population. By stating this ".populate('comments.author')", we are saying when the dishes document
             //has been constructed to send back the reply to the user, we are going to populate the author field by User document.
             .populate('comments.author')

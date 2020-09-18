@@ -9,6 +9,10 @@ var router = express.Router();
 router.use(bodyParser.json());
 
 /* GET users listing. */
+//We will add "router.options" field here because sometimes a POST request as you saw with the login, we'll send 
+//the options first to check, especially with CORS, whether the POST request will be allowed.
+//So for any endpoint under users if we received the OPTIONS will simply return a status 200 here. 
+router.options('*', cors.corsWithOptions, (req, res) => { res.sendStatus(200); });
 //We are applying "cors.corsWithOptions" even if this is GET, because this can be performed only by admin.
 router.get('/', cors.corsWithOptions, authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
     User.find({})
@@ -79,12 +83,44 @@ router.post('/signup', cors.corsWithOptions, (req, res, next) => {
 //For creating a token, we will use the function "authenticate.getToken()" that we have define in "authenticate.js" 
 //file and we will pass as the parameter the user_id, so that it can be stored in the Payload part of JSON Web Token that we are creating.
 //When we create the JSON Web Token, we will sent it back to the client in a response message.
-router.post('/login', cors.corsWithOptions, passport.authenticate('local'), (req, res) => {
-    var token = authenticate.getToken({ _id: req.user._id });
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'application/json');
-    //Sending back the token as one of the properties in the reply message.
-    res.json({ success: true, token: token, status: 'You are successfully logged in!' });
+router.post('/login', cors.corsWithOptions, (req, res, next) => {
+    //When we call this, if a authentication error occurs the "passport.authenticate" can be made to return the error value, and also it'll
+    //return the user if there is no error. And third parameter called "info", which will carry additional info that might be passed back to the
+    //user. error will be returned when there is a genuine error that occurs in the "passport.authenticate". But if the user information is sent in
+    //to "passport.authenticate" but the user doesn't exist, then that is not counted as an error. Instead, it will be counted as user doesn't exist.
+    //And that information is passed back in the "info" object. So the error will be returned when there is a genuine error that occurs during the
+    //authentication process, but the "info" will contain information if the user doesn't exist and so the "passport.authenticate" is passing back
+    //a message saying that the user doesn't exist or either the username is incorrect or the password is incorrect, and so on.
+    //And not only that, when we call this "passport.authenticate", we also need to pass in a (req, res, next) as the three parameters to it. 
+    //So this is the structure when you need to call "passport.authenticate" and expect it to pass you back information like this as a callback method here.
+    //Dakle (req, res, next) se ukljucuju nakon "passport.authenticate", jednostavno je takva sintaksa.
+    passport.authenticate('local', (err, user, info) => {
+        if (err) {
+            return next(err);
+        }
+        //If either the username or password is incorect. Znaci da ili nije pronadjen korisnik sa tim korisnickim imenom, ili je lozinka netacna.
+        //Razlog zasto je logovanje korisnika bilo neuspesno bice sadrzan u "info" koji saljemo nazad korisniku.
+        if (!user) {
+            res.statusCode = 401;
+            res.setHeader('Content-Type', 'application/json');
+            res.json({ success: false, status: 'Login Unsuccessful!', err: info });
+        }
+        //The "passport.authenticate" will add method "req.logIn".
+        //So, we will try to login the user. We are passing the "user" as the parameter to "req.logIn()".
+        req.logIn(user, (err) => {
+            if (err) {
+                res.statusCode = 401;
+                res.setHeader('Content-Type', 'application/json');
+                res.json({ success: false, status: 'Login Unsuccessful!', err: 'Could not log in user!' });
+            }
+            //Ako smo dosli do ovde, to znaci da se korisnik uspesno ulogovao, i mozemo da napravimo JSON Web Token
+            //koji saljemo korisniku.
+            var token = authenticate.getToken({ _id: req.user._id });
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.json({ success: true, status: 'Login Successful!', token: token });
+        });
+    })(req, res, next);
 });
 
 //This "/logout" endpoint will allow a user to logout from the system. Only the "get" method will be allowed on 
@@ -133,6 +169,30 @@ router.get('/facebook/token', passport.authenticate('facebook-token'), (req, res
         res.setHeader('Content-Type', 'application/json');
         res.json({ success: true, token: token, status: 'You are successfully logged in!' });
     }
+});
+
+//It is quite possible that while the client has logged in and obtained the JSON Web Token, sometime later, the JSON Web Token may expire. 
+//And so if the user tries to access from the client side with an expired token to the server, then the server will not be able to authenticate 
+//the user. So at periodic intervals we may wish to cross-check to make sure that the JSON Web Token is still valid. So that is the reason why 
+//we are including another endpoint called "/checkJWTtoken", so if you do a GET to the "/checkJWTToken" by including the token into the 
+//Authorization Header, then this call will return a true or false to indicate to you whether the JSON Web Token is still valid or not.
+//If it is not valid then the client side can initiate another login for For the user to obtain a new JSON Web Token, if required.
+router.get('/checkJWTtoken', cors.corsWithOptions, (req, res, next) => {
+    passport.authenticate('jwt', { session: false }, (err, user, info) => {
+        if (err) {
+            return next(err);
+        }
+        if (!user) {
+            res.statusCode = 401;
+            res.setHeader('Content-Type', 'application/json');
+            return res.json({ status: 'JWT invalid!', success: false, err: info });
+        }
+        else {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            return res.json({ status: 'JWT valid!', success: true, user: user });
+        }
+    })(req, res, next);
 });
 
 module.exports = router;

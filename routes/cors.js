@@ -5,7 +5,9 @@ const app = express();
 
 //The "whitelist" is an array of strings, and it contains all the origins that this server is willing to accept.
 //Znaci da cemo samo "request"-ove sa ovih domena da prihvatamo.
-const whitelist = ['http://localhost:3000', 'https://localhost:3443'];
+//Our Angular client application, if we start it up with the "ng serve" command, it runs at "localhost:4200". 
+//So any requests coming in from our Angular application to the server will carry that as the origin there. 
+const whitelist = ['http://localhost:3000', 'https://localhost:3443', 'http://localhost:4200'];
 
 //By calling this function "corsOptionsDelegate", we will check to see if the incoming request belongs to one of the "whitelist" origins.
 //If it is, then you reply back with "Access-Control-Allow-Origin" with the origin of the request set in there. Otherwise it'll not include 
